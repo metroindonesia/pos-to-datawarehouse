@@ -1,0 +1,27 @@
+{
+  "name": "pos-to-datawarehouse",
+  "version": "1.0.0",
+  "description": "Sync data dari pos cloud (mysql) metro ke datawarehouse (postgres) untuk diolah menjadi dashboard",
+  "homepage": "https://github.com/metroindonesia/pos-to-datawarehouse#readme",
+  "bugs": {
+    "url": "https://github.com/metroindonesia/pos-to-datawarehouse/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/metroindonesia/pos-to-datawarehouse.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "mysql2": "^3.23.2",
+    "node-cron": "^4.6.0",
+    "pg-promise": "^12.7.0"
+  }
+}
