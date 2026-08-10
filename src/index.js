@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import mysql from 'mysql2/promise';
 import pgPromise from 'pg-promise';
 import cron from 'node-cron';
+import { syncData } from './syncData.js';
 
 // Load environment variables
 dotenv.config();
@@ -20,98 +21,105 @@ const pgDb = pgp({
   database: process.env.PG_DATABASE || 'datawarehouse',
 });
 
-// Helper to get MySQL Connection
-async function getMySQLConnection() {
-  return await mysql.createConnection({
-    host: process.env.MYSQL_HOST || 'localhost',
-    port: parseInt(process.env.MYSQL_PORT || '3306', 10),
-    user: process.env.MYSQL_USER || 'root',
-    password: process.env.MYSQL_PASSWORD || '',
-    database: process.env.MYSQL_DATABASE || 'pos_db',
-  });
-}
+// MySQL Connection Pool (persistent)
+const mysqlPool = mysql.createPool({
+  host: process.env.MYSQL_HOST || 'localhost',
+  port: parseInt(process.env.MYSQL_PORT || '3306', 10),
+  user: process.env.MYSQL_USER || 'root',
+  password: process.env.MYSQL_PASSWORD || '',
+  database: process.env.MYSQL_DATABASE || 'pos_db',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+});
 
-// Main synchronization logic
-let isSyncing = false;
-async function syncData() {
-  if (isSyncing) {
-    console.log(`[${new Date().toISOString()}] Synchronization already in progress. Skipping...`);
-    return;
-  }
 
-  isSyncing = true;
-  console.log(`[${new Date().toISOString()}] Starting data synchronization...`);
-
-  let mysqlConn;
+// Function to check database connections
+async function checkConnections() {
+  console.log('Checking database connections...');
+  
+  // Test MySQL
   try {
-    // 1. Connect to MySQL Source Database
-    mysqlConn = await getMySQLConnection();
-    console.log('Successfully connected to MySQL source.');
-
-    // 2. Example synchronization query (Placeholder: Read and write sample data)
-    // NOTE: This can be customized according to the tables being synchronized.
-    console.log('Reading data from MySQL source...');
-    // const [rows] = await mysqlConn.execute('SELECT * FROM transactions WHERE synced = 0');
-    
-    // 3. Write data to PostgreSQL Target Database using pg-promise
-    // Example:
-    // if (rows.length > 0) {
-    //   await pgDb.tx(async t => {
-    //     const queries = rows.map(row => t.none('INSERT INTO target_table(...) VALUES(...)'));
-    //     await t.batch(queries);
-    //   });
-    // }
-    
-    console.log(`[${new Date().toISOString()}] Synchronization completed successfully.`);
+    const conn = await mysqlPool.getConnection();
+    conn.release();
+    console.log('MySQL connection test: SUCCESS');
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error during synchronization:`, error.message);
-  } finally {
-    if (mysqlConn) {
-      await mysqlConn.end().catch(err => console.error('Error closing MySQL connection:', err.message));
-    }
-    isSyncing = false;
+    console.error('MySQL connection test: FAILED -', error.message);
+    throw error;
+  }
+
+  // Test PostgreSQL
+  try {
+    const obj = await pgDb.connect();
+    obj.done(); // release connection
+    console.log('PostgreSQL connection test: SUCCESS');
+  } catch (error) {
+    console.error('PostgreSQL connection test: FAILED -', error.message);
+    throw error;
   }
 }
 
-// 1. Cron Job Configuration
-cron.schedule(CRON_SCHEDULE, async () => {
-  console.log(`[${new Date().toISOString()}] Triggering scheduled sync (Cron: ${CRON_SCHEDULE})...`);
-  await syncData();
-});
-console.log(`Cron job scheduled with expression: "${CRON_SCHEDULE}"`);
+// Start the service if connections are successful
+async function start() {
+  try {
+    await checkConnections();
 
-// 2. HTTP Server Configuration
-const server = http.createServer(async (req, res) => {
-  // Set headers
-  res.setHeader('Content-Type', 'application/json');
-
-  if (req.method === 'POST') {
-    if (req.url === '/sync') {
-      // Trigger sync asynchronously so HTTP request returns quickly
-      syncData().catch(err => console.error('Sync failed:', err));
-
-      res.writeHead(202);
-      res.end(JSON.stringify({ 
-        status: 'success', 
-        message: 'Synchronization triggered successfully.' 
-      }));
-    } else {
-      res.writeHead(404);
-      res.end(JSON.stringify({ 
-        status: 'error', 
-        message: 'Endpoint not found. Use POST /sync to trigger.' 
-      }));
+    const isRunNow = process.argv.includes('now');
+    if (isRunNow) {
+      console.log('Running synchronization immediately ("now" parameter detected)...');
+      await syncData(mysqlPool, pgDb);
+      console.log('Immediate synchronization finished. Exiting...');
+      await mysqlPool.end();
+      pgp.end();
+      process.exit(0);
     }
-  } else {
-    res.writeHead(405);
-    res.end(JSON.stringify({ 
-      status: 'error', 
-      message: 'Method Not Allowed. Use POST method.' 
-    }));
-  }
-});
+    
+    // 1. Cron Job Configuration
+    cron.schedule(CRON_SCHEDULE, async () => {
+      console.log(`[${new Date().toISOString()}] Triggering scheduled sync (Cron: ${CRON_SCHEDULE})...`);
+      await syncData(mysqlPool, pgDb);
+    });
+    console.log(`Cron job scheduled with expression: "${CRON_SCHEDULE}"`);
 
-server.listen(PORT, () => {
-  console.log(`HTTP Server is running on port ${PORT}`);
-  console.log(`Trigger manual sync via POST: http://localhost:${PORT}/sync`);
-});
+    // 2. HTTP Server Configuration
+    const server = http.createServer(async (req, res) => {
+      // Set headers
+      res.setHeader('Content-Type', 'application/json');
+
+      if (req.method === 'POST') {
+        if (req.url === '/sync') {
+          // Trigger sync asynchronously so HTTP request returns quickly
+          syncData(mysqlPool, pgDb).catch(err => console.error('Sync failed:', err));
+
+          res.writeHead(202);
+          res.end(JSON.stringify({
+            status: 'success',
+            message: 'Synchronization triggered successfully.'
+          }));
+        } else {
+          res.writeHead(404);
+          res.end(JSON.stringify({
+            status: 'error',
+            message: 'Endpoint not found. Use POST /sync to trigger.'
+          }));
+        }
+      } else {
+        res.writeHead(405);
+        res.end(JSON.stringify({
+          status: 'error',
+          message: 'Method Not Allowed. Use POST method.'
+        }));
+      }
+    });
+
+    server.listen(PORT, () => {
+      console.log(`HTTP Server is running on port ${PORT}`);
+      console.log(`Trigger manual sync via POST: http://localhost:${PORT}/sync`);
+    });
+  } catch (error) {
+    console.error('Fatal: Service failed to start due to database connection error.');
+    process.exit(1);
+  }
+}
+
+start();
