@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import mysql from 'mysql2/promise';
 import pgPromise from 'pg-promise';
 import cron from 'node-cron';
-import { syncData } from './syncData.js';
+import { dataSynchronize } from './dataSynchronize.js';
 
 // Load environment variables
 dotenv.config();
@@ -37,7 +37,7 @@ const mysqlPool = mysql.createPool({
 // Function to check database connections
 async function checkConnections() {
   console.log('Checking database connections...');
-  
+
   // Test MySQL
   try {
     const conn = await mysqlPool.getConnection();
@@ -67,13 +67,13 @@ async function start() {
     const isRunNow = process.argv.includes('now');
     if (isRunNow) {
       console.log('Running synchronization immediately ("now" parameter detected)...');
-      await syncData(mysqlPool, pgDb);
+      await dataSynchronize(mysqlPool, pgDb);
       console.log('Immediate synchronization finished. Exiting...');
       await mysqlPool.end();
       pgp.end();
       process.exit(0);
     }
-    
+
     // 1. Cron Job Configuration
     cron.schedule(CRON_SCHEDULE, async () => {
       console.log(`[${new Date().toISOString()}] Triggering scheduled sync (Cron: ${CRON_SCHEDULE})...`);
