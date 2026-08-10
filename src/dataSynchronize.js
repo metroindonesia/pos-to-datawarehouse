@@ -13,7 +13,7 @@ function writeLog(message, isError = false) {
     fs.mkdirSync(logDir, { recursive: true });
   }
   const logFile = path.join(logDir, 'sync.log');
-  const timestamp = new Date().toISOString();
+  const timestamp = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Jakarta' });
   const formattedMessage = `[${timestamp}] [${isError ? 'ERROR' : 'INFO'}] ${message}\n`;
 
   // Hapus kode warna ANSI jika ada sebelum disimpan ke file
@@ -41,12 +41,27 @@ export async function dataSynchronize(mysqlPool, pgDb) {
     mysqlConn = await mysqlPool.getConnection();
     console.log('Successfully acquired MySQL connection from pool.');
 
+    // 0. RESET DATA
+    {
+      await mysqlConn.execute(
+        `update sales_transfer_queue set
+        process_status = 0,
+        sync_batch = null,
+        process_iscompleted = 0,
+        process_start = null,
+        process_completed = null,
+        process_expired = null`
+      )
+    }
+
 
     // 1. hapus data yang sudah complete
     {
+      /*
       await mysqlConn.execute(
         `DELETE FROM sales_transfer_queue WHERE process_iscompleted=1 AND process_expired<NOW()`
       )
+      */
     }
 
 
@@ -88,7 +103,7 @@ export async function dataSynchronize(mysqlPool, pgDb) {
     while (hasMoreRows) {
       // 3. Ambil 10 baris pertama yang mempunyai time_stamp paling lama yang sync_batch bernilai kode batch saat ini dan belum diproses
       const [rows] = await mysqlConn.execute(
-        'SELECT id, data_method FROM sales_transfer_queue WHERE sync_batch = ? AND process_status = 0 ORDER BY time_stamp ASC LIMIT 10',
+        'SELECT id, sales_summary_id, data_method FROM sales_transfer_queue WHERE sync_batch = ? AND process_status = 0 ORDER BY time_stamp ASC LIMIT 10',
         [batch]
       );
 
@@ -113,13 +128,13 @@ export async function dataSynchronize(mysqlPool, pgDb) {
       try {
         await pgDb.tx(async tx => {
           for (const row of rows) {
-            const { id, data_method } = row;
+            const { id, sales_summary_id, data_method } = row;
             // Pemrosesan individual per ID
-            const data = await getPosDataByid(id, mysqlConn);
+            const data = await getPosDataByid(sales_summary_id, mysqlConn);
 
 
             // tulis ke data warehouse
-            await writePosDataBy(id, data, data_method, tx)
+            await writePosDataBy(sales_summary_id, data, data_method, tx)
 
 
             // Update process_completed=1 di MySQL
@@ -134,8 +149,8 @@ export async function dataSynchronize(mysqlPool, pgDb) {
 
 
         // beri jeda waktu 10 detik
-        console.log('Waiting 10 seconds before processing next chunk...');
-        await new Promise(resolve => setTimeout(resolve, 10000));
+        console.log('Waiting 1 seconds before processing next chunk...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
       } catch (err) {
         console.error('Transaction failed, PostgreSQL changes rolled back:', err.message);
