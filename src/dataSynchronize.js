@@ -41,7 +41,7 @@ export async function dataSynchronize(mysqlPool, pgDb) {
     mysqlConn = await mysqlPool.getConnection();
     console.log('Successfully acquired MySQL connection from pool.');
 
-    // 0. RESET DATA
+    // 0. RESET DATA, di production tidak perlu
     {
       await mysqlConn.execute(
         `update sales_transfer_queue set
@@ -55,14 +55,12 @@ export async function dataSynchronize(mysqlPool, pgDb) {
     }
 
 
-    // 1. hapus data yang sudah complete
-    {
-      /*
-      await mysqlConn.execute(
-        `DELETE FROM sales_transfer_queue WHERE process_iscompleted=1 AND process_expired<NOW()`
-      )
-      */
-    }
+    // // 1. hapus data yang sudah complete
+    // {
+    //   await mysqlConn.execute(
+    //     `DELETE FROM sales_transfer_queue WHERE process_iscompleted=1 AND process_expired<NOW()`
+    //   )
+    // }
 
 
     // 2. update proses yang sudah expired dan belum complete
