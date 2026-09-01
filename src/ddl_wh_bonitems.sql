@@ -4,9 +4,9 @@
 
 -- DROP TABLE public.salesitem;
 
-CREATE TABLE public.positem (
+CREATE TABLE public.bonitem (
 	line_id bigserial NOT NULL,
-	pos_id int8 NOT NULL,
+	bon_id int8 NOT NULL,
 	dept_no text NULL,
 	class_no text NULL,
 	sku text NULL,
@@ -21,9 +21,10 @@ CREATE TABLE public.positem (
 	staff_name text NULL,
 	barcode1 text NULL,
 	barcode2 text NULL,
-	flag text NULL,
+	flag char(1),
 	discount_type text NULL,
 	discount_value numeric NULL,
 	discount_percentage int4 NULL,
-	CONSTRAINT salesitem_pk PRIMARY KEY (line_id)
+	timestamp timestamp,
+	CONSTRAINT bonitem_pk PRIMARY KEY (line_id)
 );

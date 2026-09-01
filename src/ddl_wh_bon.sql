@@ -1,8 +1,8 @@
 
-CREATE TABLE public.pos (
-	pos_id bigserial NOT NULL PRIMARY KEY,
-	pos_date date NULL,
-	pos_time time NULL,
+CREATE TABLE public.bon (
+	bon_id bigserial NOT NULL,
+	bon_date date NULL,
+	bon_time time NULL,
 	store_no text NULL,
 	transaction_no text NULL,
 	pos_code text NULL,
@@ -18,7 +18,9 @@ CREATE TABLE public.pos (
 	transaction_flag text NULL,
 	cancel_transaction_no text NULL,
 	deposit_transaction_no text NULL,
-	flag text NULL,
+	flag char(1),
 	site_code text NULL,
-	channel text NULL
+	channel text NULL,
+	timestamp timestamp,
+	CONSTRAINT bon_pk PRIMARY KEY (bon_id)
 );

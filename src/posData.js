@@ -4,15 +4,16 @@ export async function getPosDataByid(id, mysqlConn) {
     try {
         const [header] = await mysqlConn.execute(
             `SELECT 
-            A.id as pos_id, 
+            A.id as bon_id, 
             A.store_no, 
-            A.sales_date as pos_date, 
-            A.time_stamp as pos_time,
+            A.sales_date as bon_date, 
+            A.time_stamp as bon_time,
             A.transaction_no, A.pos_code, A.total_gross, A.total_netsales, 
             A.total_payment, A.cashier_id, A.loyalty_member, A.loyalty_id, A.loyalty_name, A.transaction_type,
             A.transaction_status, A.transaction_flag, A.cancel_transaction_no, A.deposit_transaction_no,
             A.time_stamp, A.flag,
-            B.site_code, B.channel
+            B.site_code, B.channel,
+            A.time_stamp as timestamp
             FROM 
             sales_summary A left join sales_site B on B.sales_summary_id=A.id
             WHERE 
@@ -24,11 +25,12 @@ export async function getPosDataByid(id, mysqlConn) {
         const [items] = await mysqlConn.execute(
             `SELECT
             A.id as line_id, 
-            A.sales_summary_id as pos_id, 
+            A.sales_summary_id as bon_id, 
             A.dept_no, A.class_no, A.sku, A.sku_promo, A.sku_promo_adhoc,
             A.qty, A.original_price, A.sales_price, A.gross, A.netsales, A.staff_id, A.staff_name,
             A.barcode1, A.barcode2, A.flag,
-            B.discount_type, B.discount_value, B.discount_percentage, B.discount_code
+            B.discount_type, B.discount_value, B.discount_percentage, B.discount_code,
+            A.time_stamp as timestamp
             FROM
             sales_item A left join sales_item_discount B on B.sales_item_id= A.id
             WHERE
@@ -39,8 +41,10 @@ export async function getPosDataByid(id, mysqlConn) {
         const [payments] = await mysqlConn.execute(
             `SELECT
             A.id as line_id, 
-            A.sales_summary_id as pos_id, 
-            A.method, A.code, A.card_no, A.amount, A.approval_code
+            A.sales_summary_id as bon_id, 
+            A.method, A.code, A.card_no, A.amount, A.approval_code,
+            A.flag,
+            A.time_stamp as timestamp
             FROM
             sales_payment A
             WHERE
