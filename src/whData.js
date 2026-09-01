@@ -1,5 +1,5 @@
 
-export async function writePosDataBy(id, data, data_method, tx) {
+export async function writePosData(data, data_method, tx) {
     try {
         const header = data.header && data.header[0];
         if (!header) {
@@ -9,9 +9,9 @@ export async function writePosDataBy(id, data, data_method, tx) {
         const items = data.items || [];
         const payments = data.payments || [];
 
-        await writeHeader(id, header, data_method, tx);
-        await writeItems(id, items, data_method, tx);
-        await writePayments(id, payments, data_method, tx);
+        await writeHeader(tx, header);
+        await writeItems(tx, items);
+        await writePayments(tx, payments);
 
     } catch (err) {
         throw err;
@@ -20,7 +20,7 @@ export async function writePosDataBy(id, data, data_method, tx) {
 
 
 
-async function writeHeader(id, header, data_method, tx) {
+async function writeHeader(tx, header) {
     try {
 
         // Format bon_time from header.bon_time if available
@@ -108,7 +108,7 @@ async function writeHeader(id, header, data_method, tx) {
 }
 
 
-async function writeItems(id, items, data_method, tx) {
+async function writeItems(tx, items) {
     if (!items || items.length === 0) {
         return;
     }
@@ -175,7 +175,7 @@ async function writeItems(id, items, data_method, tx) {
 }
 
 
-async function writePayments(id, payments, data_method, tx) {
+async function writePayments(tx, payments) {
     if (!payments || payments.length === 0) {
         return;
     }

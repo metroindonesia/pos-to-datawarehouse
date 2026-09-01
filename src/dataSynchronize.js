@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { uniqid } from './uniqid.js';
 import { getPosDataByid } from './posData.js'
-import { writePosDataBy } from './whData.js'
+import { writePosData } from './whData.js'
 
 let isSyncing = false;
 
@@ -132,7 +132,7 @@ export async function dataSynchronize(mysqlPool, pgDb) {
 
 
             // tulis ke data warehouse
-            await writePosDataBy(sales_summary_id, data, data_method, tx)
+            await writePosData(data, data_method, tx)
 
 
             // Update process_completed=1 di MySQL
@@ -147,8 +147,8 @@ export async function dataSynchronize(mysqlPool, pgDb) {
 
 
         // beri jeda waktu 10 detik
-        console.log('Waiting 1 seconds before processing next chunk...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // console.log('Waiting 1 seconds before processing next chunk...');
+        // await new Promise(resolve => setTimeout(resolve, 1000));
 
       } catch (err) {
         console.error('Transaction failed, PostgreSQL changes rolled back:', err.message);
