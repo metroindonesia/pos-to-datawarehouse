@@ -3,6 +3,8 @@ import path from 'path';
 import { uniqid } from './uniqid.js';
 import { getPosDataByid } from './posData.js'
 import { writePosData } from './whData.js'
+import { summaryPayments } from './whSumPayment.js';
+import { summaryItems } from './whSumItems.js';
 
 let isSyncing = false;
 
@@ -134,6 +136,10 @@ export async function dataSynchronize(mysqlPool, pgDb) {
             // tulis ke data warehouse
             await writePosData(data, data_method, tx)
 
+            await Promise.all([
+              summaryItems(tx, sales_summary_id, data_method),
+              summaryPayments(tx, sales_summary_id, data_method)
+            ]);
 
             // Update process_completed=1 di MySQL
             await mysqlConn.query(
